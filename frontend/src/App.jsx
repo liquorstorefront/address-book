@@ -31,9 +31,16 @@ function displayName(contact) {
   return name || "No contact name";
 }
 
+function toFormContact(contact) {
+  return Object.fromEntries(
+    Object.keys(emptyContact).map((field) => [field, contact[field] || ""])
+  );
+}
+
 export default function App() {
   const [contact, setContact] = useState(emptyContact);
   const [contacts, setContacts] = useState([]);
+  const [editingContactId, setEditingContactId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -56,6 +63,18 @@ export default function App() {
     });
   }
 
+  function editContact(savedContact) {
+    setError("");
+    setEditingContactId(savedContact.id);
+    setContact(toFormContact(savedContact));
+  }
+
+  function cancelEdit() {
+    setError("");
+    setEditingContactId(null);
+    setContact(emptyContact);
+  }
+
   async function saveContact(event) {
     event.preventDefault();
     setError("");
@@ -66,8 +85,9 @@ export default function App() {
     );
 
     try {
-      const response = await fetch(`${API_URL}/contacts`, {
-        method: "POST",
+      const isEditing = editingContactId !== null;
+      const response = await fetch(`${API_URL}/contacts${isEditing ? `/${editingContactId}` : ""}`, {
+        method: isEditing ? "PUT" : "POST",
         headers: {
           "Content-Type": "application/json",
         },
@@ -79,6 +99,7 @@ export default function App() {
       }
 
       setContact(emptyContact);
+      setEditingContactId(null);
       await loadContacts();
     } catch (saveError) {
       setError(saveError.message);
@@ -91,6 +112,7 @@ export default function App() {
     <main className="app-shell">
       <section className="entry-panel">
         <h1>Address Book</h1>
+        {editingContactId !== null ? <p className="edit-mode">Editing contact</p> : null}
         <form onSubmit={saveContact}>
           {fields.map(([name, label, required]) => (
             <label key={name}>
@@ -115,9 +137,16 @@ export default function App() {
 
           {error ? <p className="form-error">{error}</p> : null}
 
-          <button type="submit" disabled={isSaving}>
-            {isSaving ? "Saving..." : "Save Contact"}
-          </button>
+          <div className="form-actions">
+            <button type="submit" disabled={isSaving}>
+              {isSaving ? "Saving..." : editingContactId !== null ? "Update Contact" : "Save Contact"}
+            </button>
+            {editingContactId !== null ? (
+              <button className="secondary-button" type="button" onClick={cancelEdit}>
+                Cancel
+              </button>
+            ) : null}
+          </div>
         </form>
       </section>
 
@@ -137,6 +166,13 @@ export default function App() {
                   <h3>{savedContact.company}</h3>
                   <p>{displayName(savedContact)}</p>
                 </div>
+                <button
+                  className="edit-button"
+                  type="button"
+                  onClick={() => editContact(savedContact)}
+                >
+                  Edit
+                </button>
                 <dl>
                   {savedContact.title ? (
                     <>
